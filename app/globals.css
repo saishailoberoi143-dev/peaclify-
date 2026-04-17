@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+  --void: #0a0a0f;
+  --nebula: #7c3aed;
+  --ember: #ff6b35;
+  --pulse: #3b82f6;
+  --aura: #06b6d4;
+  --serenity: #a78bfa;
+  --warmth: #fbbf24;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--void);
+  color: #e2e8f0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ======== Scrollbar Styling ======== */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(10, 10, 15, 0.8);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--nebula), var(--ember));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--serenity), var(--warmth));
+}
+
+/* ======== Aurora Mesh Background ======== */
+@keyframes auroraMove1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(100px, -80px) scale(1.1); }
+  50% { transform: translate(-60px, 60px) scale(0.9); }
+  75% { transform: translate(80px, 40px) scale(1.05); }
+}
+@keyframes auroraMove2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-80px, 100px) scale(1.1); }
+  50% { transform: translate(60px, -40px) scale(0.95); }
+  75% { transform: translate(-40px, -60px) scale(1.08); }
+}
+@keyframes auroraMove3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(60px, 60px) scale(0.9); }
+  50% { transform: translate(-100px, -20px) scale(1.12); }
+  75% { transform: translate(40px, -80px) scale(0.98); }
+}
+
+.aurora-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.3;
+  pointer-events: none;
+  z-index: 0;
+}
+.aurora-orb-1 {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, var(--nebula), transparent 70%);
+  top: -10%;
+  left: -5%;
+  animation: auroraMove1 20s ease-in-out infinite;
+}
+.aurora-orb-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, var(--ember), transparent 70%);
+  top: 40%;
+  right: -10%;
+  animation: auroraMove2 25s ease-in-out infinite;
+}
+.aurora-orb-3 {
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, var(--pulse), transparent 70%);
+  bottom: -10%;
+  left: 30%;
+  animation: auroraMove3 22s ease-in-out infinite;
+}
+
+/* ======== Glassmorphism Utility Classes ======== */
+@layer components {
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+  }
+
+  .glass-strong {
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+  }
+
+  .glass-card {
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .glass-card:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(124, 58, 237, 0.3);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 60px rgba(124, 58, 237, 0.15),
+                0 0 40px rgba(124, 58, 237, 0.05);
+  }
+
+  .glow-text {
+    background: linear-gradient(135deg, #e2e8f0, var(--serenity), var(--ember));
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer 4s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .glow-btn {
+    position: relative;
+    background: linear-gradient(135deg, var(--nebula), var(--ember));
+    border: none;
+    border-radius: 14px;
+    padding: 14px 32px;
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+
+  .glow-btn::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--nebula), var(--ember), var(--pulse));
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    filter: blur(12px);
+  }
+
+  .glow-btn:hover::before {
+    opacity: 1;
+  }
+
+  .glow-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 40px rgba(124, 58, 237, 0.4);
+  }
+}
+
+/* ======== Selection Color ======== */
+::selection {
+  background: rgba(124, 58, 237, 0.4);
+  color: #fff;
+}
+
+/* ======== Focus Ring ======== */
+:focus-visible {
+  outline: 2px solid var(--nebula);
+  outline-offset: 2px;
+}
