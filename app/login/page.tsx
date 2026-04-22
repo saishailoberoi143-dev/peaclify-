@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase-browser';
+import { setSession } from '@/lib/auth';
 import {
   Mail, Lock, Eye, EyeOff, ArrowRight, Loader2,
   GraduationCap, Stethoscope, Sparkles, CheckCircle, KeyRound,
@@ -15,7 +16,6 @@ type AuthMode = 'login' | 'signup';
 type UserRole = 'student' | 'psychologist';
 
 // ===== LOCAL AUTH HELPERS =====
-// Used as the primary auth when Supabase is not configured
 function getLocalUsers(): Record<string, { password: string; role: UserRole }> {
   try {
     return JSON.parse(localStorage.getItem('peaclify_local_users') || '{}');
@@ -23,11 +23,6 @@ function getLocalUsers(): Record<string, { password: string; role: UserRole }> {
 }
 function saveLocalUsers(users: Record<string, { password: string; role: UserRole }>) {
   try { localStorage.setItem('peaclify_local_users', JSON.stringify(users)); } catch {}
-}
-function setLocalSession(email: string, role: UserRole) {
-  try {
-    localStorage.setItem('peaclify_session', JSON.stringify({ email, role, loggedIn: true }));
-  } catch {}
 }
 
 // Save role to localStorage as a reliable fallback
@@ -61,7 +56,7 @@ export default function LoginPage() {
       }
       users[email] = { password, role };
       saveLocalUsers(users);
-      setLocalSession(email, role);
+      setSession(email, role);
       setSuccess('Account created! Redirecting...');
       setTimeout(() => {
         router.push(`/dashboard/${role}`);
@@ -77,7 +72,7 @@ export default function LoginPage() {
         setError('Incorrect password. Please try again.');
         return;
       }
-      setLocalSession(email, user.role);
+      setSession(email, user.role);
       router.push(`/dashboard/${user.role}`);
       router.refresh();
     }
@@ -159,6 +154,7 @@ export default function LoginPage() {
 
           // Save locally for future logins too
           saveRoleLocally(data.user.id, userRole);
+          setSession(email, userRole);
 
           router.push(`/dashboard/${userRole}`);
           router.refresh();

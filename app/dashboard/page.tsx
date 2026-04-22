@@ -2,52 +2,24 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase-browser';
+import { getSession } from '@/lib/auth';
 import PageTransition from '@/components/PageTransition';
 import { motion } from 'framer-motion';
 import { Loader2, Sparkles } from 'lucide-react';
-
-type UserRole = 'student' | 'psychologist';
-
-function getRoleFromStorage(userId: string): UserRole | null {
-  try { return localStorage.getItem(`peaclify_role_${userId}`) as UserRole | null; } catch { return null; }
-}
 
 export default function DashboardPage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    async function checkRole() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.replace('/login'); return; }
-
-        let role: UserRole = 'student';
-
-        // 1. Try Supabase profiles table
-        try {
-          const { data: profile, error } = await supabase
-            .from('profiles').select('role').eq('id', user.id).single();
-          if (!error && profile?.role) {
-            role = profile.role as UserRole;
-          } else {
-            throw new Error('no profile');
-          }
-        } catch {
-          // 2. Fallback: localStorage
-          const localRole = getRoleFromStorage(user.id);
-          if (localRole) role = localRole;
-        }
-
-        router.replace(`/dashboard/${role}`);
-      } catch {
-        router.replace('/dashboard/student');
-      } finally {
-        setChecking(false);
-      }
+    const session = getSession();
+    if (!session) {
+      router.replace('/login');
+      return;
     }
-    checkRole();
+    // Redirect to role-specific dashboard
+    router.replace(`/dashboard/${session.role}`);
+    setChecking(false);
   }, [router]);
 
   if (!checking) return null;
