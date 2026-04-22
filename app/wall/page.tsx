@@ -3,7 +3,13 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PageTransition from '@/components/PageTransition';
-import { supabase } from '@/lib/supabase-browser';
+import {
+  getWallPosts,
+  addWallPost,
+  toggleLikePost,
+  hasUserLikedPost,
+  type WallPost,
+} from '@/lib/wallStorage';
 import {
   Globe,
   Heart,
@@ -16,89 +22,6 @@ import {
   Loader2,
 } from 'lucide-react';
 
-interface Post {
-  id: string;
-  content: string;
-  emoji: string;
-  likes: number;
-  replies: number;
-  created_at: string;
-  color: string;
-  liked: boolean;
-}
-
-const gradientColors = [
-  'from-nebula/20 to-nebula/5',
-  'from-ember/20 to-ember/5',
-  'from-warmth/20 to-warmth/5',
-  'from-serenity/20 to-serenity/5',
-  'from-aura/20 to-aura/5',
-  'from-pulse/20 to-pulse/5',
-];
-
-const mockPosts: Post[] = [
-  {
-    id: '1',
-    content: '"The storm will pass. It always does." Needed to hear my own words today.',
-    emoji: '🌊',
-    likes: 47,
-    replies: 12,
-    created_at: new Date(Date.now() - 2 * 60000).toISOString(),
-    color: 'from-nebula/20 to-nebula/5',
-    liked: false,
-  },
-  {
-    id: '2',
-    content: 'Day 30 of therapy and I finally cried in session. Feels like unlocking a door I forgot existed.',
-    emoji: '🔓',
-    likes: 128,
-    replies: 34,
-    created_at: new Date(Date.now() - 8 * 60000).toISOString(),
-    color: 'from-ember/20 to-ember/5',
-    liked: false,
-  },
-  {
-    id: '3',
-    content: 'Small win: I went outside today. Just sat on the porch for 10 minutes. It counts.',
-    emoji: '☀️',
-    likes: 256,
-    replies: 45,
-    created_at: new Date(Date.now() - 15 * 60000).toISOString(),
-    color: 'from-warmth/20 to-warmth/5',
-    liked: false,
-  },
-  {
-    id: '4',
-    content: "Reminder: You don't always need to be productive. Sometimes existing is enough.",
-    emoji: '🌙',
-    likes: 312,
-    replies: 28,
-    created_at: new Date(Date.now() - 22 * 60000).toISOString(),
-    color: 'from-serenity/20 to-serenity/5',
-    liked: false,
-  },
-  {
-    id: '5',
-    content: 'Started a gratitude journal today. First entry: grateful for this anonymous space where I can just be.',
-    emoji: '📝',
-    likes: 89,
-    replies: 16,
-    created_at: new Date(Date.now() - 35 * 60000).toISOString(),
-    color: 'from-aura/20 to-aura/5',
-    liked: false,
-  },
-  {
-    id: '6',
-    content: 'My anxiety said "what if everything goes wrong?" and I replied "what if everything goes right?" for the first time.',
-    emoji: '💪',
-    likes: 445,
-    replies: 67,
-    created_at: new Date(Date.now() - 60 * 60000).toISOString(),
-    color: 'from-pulse/20 to-pulse/5',
-    liked: false,
-  },
-];
-
 function timeAgo(dateStr: string): string {
   const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
   if (seconds < 60) return 'just now';
@@ -110,8 +33,12 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
+interface DisplayPost extends WallPost {
+  liked: boolean;
+}
+
 export default function WallPage() {
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<DisplayPost[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [newContent, setNewContent] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('💜');
@@ -122,49 +49,24 @@ export default function WallPage() {
 
   const emojis = ['💜', '🌊', '☀️', '🌙', '🔥', '🌿', '✨', '🫂', '📝', '💪'];
 
-  // Fetch posts from Supabase, fallback to mock data
-  const fetchPosts = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('echo_wall')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-
-      if (data) {
-        const mapped: Post[] = data.map((row, i) => ({
-          id: row.id?.toString() || i.toString(),
-          content: row.content || '',
-          emoji: row.emoji || '💜',
-          likes: row.likes || 0,
-          replies: row.replies || 0,
-          created_at: row.created_at || new Date().toISOString(),
-          color: gradientColors[i % gradientColors.length],
-          liked: false,
-        }));
-        setPosts(mapped.length > 0 ? mapped : mockPosts);
-      } else {
-        // No data in table yet, use mock seed posts
-        setPosts(mockPosts);
-      }
-    } catch {
-      // Supabase not configured or table doesn't exist — use mock data
-      console.log('Using mock data for Echo Wall (Supabase not configured)');
-      setPosts(mockPosts);
-    } finally {
-      setLoading(false);
-    }
+  // Load posts from localStorage
+  const loadPosts = useCallback(() => {
+    const wallPosts = getWallPosts();
+    const displayPosts: DisplayPost[] = wallPosts.map((p) => ({
+      ...p,
+      liked: hasUserLikedPost(p),
+    }));
+    setPosts(displayPosts);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
+    loadPosts();
+  }, [loadPosts]);
 
   // Create masonry columns
   const columns = useMemo(() => {
-    const cols: Post[][] = [[], [], []];
+    const cols: DisplayPost[][] = [[], [], []];
     posts.forEach((post, i) => {
       cols[i % 3].push(post);
     });
@@ -172,63 +74,32 @@ export default function WallPage() {
   }, [posts]);
 
   const handleLike = (id: string) => {
+    const updatedPost = toggleLikePost(id);
+    if (!updatedPost) return;
+
     setPosts((prev) =>
       prev.map((p) =>
         p.id === id
-          ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 }
+          ? { ...p, liked: hasUserLikedPost(updatedPost), likes: updatedPost.likes }
           : p
       )
     );
   };
 
-  const handlePost = async () => {
+  const handlePost = () => {
     if (!newContent.trim()) return;
     setPosting(true);
 
-    const newPost: Post = {
-      id: Date.now().toString(),
-      content: newContent.trim(),
-      emoji: selectedEmoji,
-      likes: 0,
-      replies: 0,
-      created_at: new Date().toISOString(),
-      color: gradientColors[Math.floor(Math.random() * gradientColors.length)],
-      liked: false,
-    };
+    const newPost = addWallPost(newContent, selectedEmoji, isRecovery);
 
-    // Try to insert into Supabase
-    try {
-      const { data: inserted, error } = await supabase
-        .from('echo_wall')
-        .insert({
-          content: newContent.trim(),
-          emoji: selectedEmoji,
-          likes: 0,
-          replies: 0,
-        })
-        .select()
-        .single();
+    // Reload all posts to get sorted order
+    loadPosts();
 
-      if (error) throw error;
-
-      // Use real DB id for the post so it's persistent
-      if (inserted) {
-        newPost.id = inserted.id?.toString();
-      }
-    } catch {
-      console.log('Added post locally (Supabase insert failed)');
-    }
-
-    // Add to local state and re-fetch to sync
-    setPosts((prev) => [newPost, ...prev]);
     setNewContent('');
     setSelectedEmoji('💜');
     setShowModal(false);
     setIsRecovery(false);
     setPosting(false);
-
-    // Re-fetch after short delay so DB is consistent
-    setTimeout(() => fetchPosts(), 800);
   };
 
   return (
@@ -283,9 +154,9 @@ export default function WallPage() {
               {u === 'LPU' ? '🎓 LPU' : '🌐 Global'}
             </button>
           ))}
-          {/* #Exams badge — shows when posts tagged with exams */}
+          {/* Post count badge */}
           <span className="ml-auto text-[11px] bg-nebula/15 border border-nebula/30 text-nebula px-3 py-1 rounded-full">
-            847 students feeling this ✦ #Exams
+            {posts.length} echoes on the wall ✦
           </span>
         </div>
 
@@ -314,9 +185,16 @@ export default function WallPage() {
                     />
 
                     <div className="relative z-10">
-                      {/* Emoji + Time */}
+                      {/* Emoji + Time + Recovery badge */}
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-xl">{post.emoji}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{post.emoji}</span>
+                          {post.isRecovery && (
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                              🌱 Recovery
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-slate-500 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           {timeAgo(post.created_at)}

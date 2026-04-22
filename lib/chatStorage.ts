@@ -1,5 +1,6 @@
 // Chat persistence layer using localStorage
-// Each conversation is stored as a separate entry with a unique ID
+// Each user gets their own separate storage namespace based on email
+// This ensures chats are private and persist across sessions
 
 export interface ChatMessage {
   id: string;
@@ -21,13 +22,33 @@ export interface ChatSession {
   updatedAt: string;
 }
 
-const STORAGE_KEY = 'peaclify_chats';
-const ACTIVE_CHAT_KEY = 'peaclify_active_chat';
+// ===== USER-SCOPED STORAGE KEYS =====
+// Returns a unique storage key per user so each account has its own chats
+function getCurrentUserEmail(): string {
+  try {
+    const session = localStorage.getItem('peaclify_session');
+    if (session) {
+      const parsed = JSON.parse(session);
+      if (parsed.email) return parsed.email;
+    }
+  } catch {}
+  return '_anonymous';
+}
 
-// Get all chat sessions from localStorage
+function getStorageKey(): string {
+  const email = getCurrentUserEmail();
+  return `peaclify_chats_${email}`;
+}
+
+function getActiveChatKey(): string {
+  const email = getCurrentUserEmail();
+  return `peaclify_active_chat_${email}`;
+}
+
+// Get all chat sessions from localStorage (scoped to current user)
 export function getAllSessions(): ChatSession[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(getStorageKey());
     if (!raw) return [];
     const sessions: ChatSession[] = JSON.parse(raw);
     // Sort by most recently updated
@@ -109,10 +130,10 @@ export function addMessageToSession(
   return session;
 }
 
-// Get/set the active session ID
+// Get/set the active session ID (scoped to current user)
 export function getActiveSessionId(): string | null {
   try {
-    return localStorage.getItem(ACTIVE_CHAT_KEY);
+    return localStorage.getItem(getActiveChatKey());
   } catch {
     return null;
   }
@@ -120,13 +141,13 @@ export function getActiveSessionId(): string | null {
 
 export function setActiveSessionId(id: string): void {
   try {
-    localStorage.setItem(ACTIVE_CHAT_KEY, id);
+    localStorage.setItem(getActiveChatKey(), id);
   } catch {}
 }
 
 export function clearActiveSessionId(): void {
   try {
-    localStorage.removeItem(ACTIVE_CHAT_KEY);
+    localStorage.removeItem(getActiveChatKey());
   } catch {}
 }
 
@@ -150,14 +171,14 @@ export function formatRelativeTime(isoString: string): string {
 
 function saveSessions(sessions: ChatSession[]): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    localStorage.setItem(getStorageKey(), JSON.stringify(sessions));
   } catch (e) {
     console.warn('Failed to save chat sessions:', e);
     // If quota exceeded, remove oldest sessions
     if (sessions.length > 20) {
       sessions.splice(20);
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+        localStorage.setItem(getStorageKey(), JSON.stringify(sessions));
       } catch {}
     }
   }
