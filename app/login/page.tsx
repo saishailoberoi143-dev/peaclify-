@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase-browser';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase-browser';
 import {
   Mail, Lock, Eye, EyeOff, ArrowRight, Loader2,
   GraduationCap, Stethoscope, Sparkles, CheckCircle, KeyRound,
@@ -13,6 +13,22 @@ const PSYCH_ACCESS_CODE = '12345';
 
 type AuthMode = 'login' | 'signup';
 type UserRole = 'student' | 'psychologist';
+
+// ===== LOCAL AUTH HELPERS =====
+// Used as the primary auth when Supabase is not configured
+function getLocalUsers(): Record<string, { password: string; role: UserRole }> {
+  try {
+    return JSON.parse(localStorage.getItem('peaclify_local_users') || '{}');
+  } catch { return {}; }
+}
+function saveLocalUsers(users: Record<string, { password: string; role: UserRole }>) {
+  try { localStorage.setItem('peaclify_local_users', JSON.stringify(users)); } catch {}
+}
+function setLocalSession(email: string, role: UserRole) {
+  try {
+    localStorage.setItem('peaclify_session', JSON.stringify({ email, role, loggedIn: true }));
+  } catch {}
+}
 
 // Save role to localStorage as a reliable fallback
 function saveRoleLocally(userId: string, role: UserRole) {
@@ -34,6 +50,39 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // ===== LOCAL-ONLY AUTH (no Supabase needed) =====
+  const handleLocalAuth = () => {
+    const users = getLocalUsers();
+
+    if (mode === 'signup') {
+      if (users[email]) {
+        setError('An account with this email already exists. Please log in instead.');
+        return;
+      }
+      users[email] = { password, role };
+      saveLocalUsers(users);
+      setLocalSession(email, role);
+      setSuccess('Account created! Redirecting...');
+      setTimeout(() => {
+        router.push(`/dashboard/${role}`);
+        router.refresh();
+      }, 600);
+    } else {
+      const user = users[email];
+      if (!user) {
+        setError('No account found with this email. Please sign up first.');
+        return;
+      }
+      if (user.password !== password) {
+        setError('Incorrect password. Please try again.');
+        return;
+      }
+      setLocalSession(email, user.role);
+      router.push(`/dashboard/${user.role}`);
+      router.refresh();
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); setSuccess('');
@@ -47,6 +96,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // If Supabase is not configured, use local auth
+      if (!isSupabaseConfigured) {
+        handleLocalAuth();
+        return;
+      }
+
       if (mode === 'signup') {
         const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
         if (signUpError) throw signUpError;
@@ -111,9 +166,9 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Something went wrong';
-      // Make "Failed to fetch" human readable
+      // If Supabase fails with network error, fall back to local auth
       if (msg.includes('fetch') || msg.includes('network') || msg.includes('placeholder')) {
-        setError('Supabase is not configured. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to your .env.local file.');
+        handleLocalAuth();
       } else {
         setError(msg);
       }
